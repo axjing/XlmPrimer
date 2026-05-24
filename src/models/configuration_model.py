@@ -9,7 +9,7 @@ class GPTConfig:
     #     "num_attention_heads": "n_head",
     #     "num_hidden_layers": "n_layer",
     # }
-    
+    model_type = "GPT-2"
     # model scale parameters
     n_positions:int=1024 # 最大上下文长度
     vocab_size:int=50304 # GPT-2的词汇表大小为50257，为提高效率，填充到最接近的64的倍数。
@@ -51,3 +51,29 @@ class GPTConfig:
     add_cross_attention:bool=False # 是否添加跨注意力机制
     tie_word_embeddings=True # 是否将 word embedding 层和 output 层的权重共享(GPT经典做法，为了省参数量)
 
+    
+@dataclass
+class SigLIPConfig(GPTConfig):
+    model_type = "siglip_text_model"
+    
+    vocab_size: int = 32000
+    n_embd: int = 768
+    n_inner: int|None = 3072
+    n_layer: int = 12
+    n_head: int = 12
+    max_position_embeddings: int = 64
+    hidden_act: str = "gelu_pytorch_tanh"
+    layer_norm_eps: float = 1e-6
+    attention_dropout: float | int = 0.0
+    # This differs from `CLIPTokenizer`'s default and from openai/siglip
+    # See https://github.com/huggingface/transformers/pull/24773#issuecomment-1632287538
+    pad_token_id: int | None = 1
+    bos_token_id: int | None = 49406
+    eos_token_id: int | list[int] | None = 49407
+    projection_size: int | None = None
+    
+    n_channel: int = 3
+    image_size: int | list[int] | tuple[int, int] = 224
+    patch_size: int | list[int] | tuple[int, int] = 16    
+    vit_cls_flag: bool = False
+    

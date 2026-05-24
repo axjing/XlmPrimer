@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.configuration_model import GPTConfig
+from src.models.configuration_model import GPTConfig
 
 
 class Conv1D(nn.Module):
