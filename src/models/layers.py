@@ -76,7 +76,42 @@ class LayerNorm(nn.Module):
         o=F.layer_norm(x,self.weight.shape, self.weight, self.bias, self.eps)
         
         return o
+
+class RMSNorm(nn.Module):
+    """
+    Root Mean Square Layer Normalization (RMSNorm).
+
+    Normalizes the input across the last dimension using RMS normalization,
+    which scales the input without subtracting the mean. Commonly used as a
+    lighter alternative to LayerNorm in transformer models.
+
+    Args:
+        cfg: A configuration object containing:
+            - lm_hidden_dim (int): The dimensionality of the model hidden states. 
+            - lm_rms_eps (float): A small constant to avoid division by zero.
+    """
+    
+    def __init__(self,cfg:GPTConfig):
+        super().__init__()
+        self.weight=nn.Parameter(torch.ones(cfg.n_inner))
+        self.eps=cfg.layer_norm_epsilon
+    
+    def forward(self,x: torch.Tensor):
+        """
+        Forward pass for RMSNorm.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, sequence_length, lm_hidden_dim).
+
+        Returns:
+            torch.Tensor: Normalized tensor of the same shape as input.
+        """
         
+        # 计算均方根的倒数：对张量逐元素求平方，在隐层维度lm_hidden_dim上求取平均值。
+        irms=torch.rsqrt(torch.mean(x**2,dim=-1,keepdim=True)+self.eps)
+        x=x*irms*self.weight
+        return x
+
 class CausalSelfAttention(nn.Module):
 
     def __init__(self, config: GPTConfig,is_cross_attention:bool=False,ctrl_flash:bool=True):
