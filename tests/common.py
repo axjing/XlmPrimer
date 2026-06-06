@@ -14,6 +14,7 @@ from filelock import FileLock
 # Linear layers cast their weights to this dtype in forward, replacing torch.amp.autocast.
 # Override with NANOCHAT_DTYPE env var: "bfloat16", "float16", "float32"
 _DTYPE_MAP = {"bfloat16": torch.bfloat16, "float16": torch.float16, "float32": torch.float32}
+
 def _detect_compute_dtype():
     env = os.environ.get("NANOCHAT_DTYPE")
     if env is not None:
