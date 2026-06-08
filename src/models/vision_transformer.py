@@ -187,7 +187,7 @@ class ViT(nn.Module):
         from huggingface_hub import hf_hub_download
         import safetensors
         
-        hf_config=Siglip2VisionConfig.from_pretrained("google/siglip-so400m-patch14-384",filename="model.safetensors")
+        hf_config=Siglip2VisionConfig.from_pretrained(cfg.vit_model_type,filename="model.safetensors")
 
         cfg.attn_pdrop=hf_config.attention_dropout
         cfg.n_embd=hf_config.hidden_size
@@ -201,7 +201,7 @@ class ViT(nn.Module):
         
         model=cls(cfg)
         safetensors_file=hf_hub_download(
-            repo_id="google/siglip-so400m-patch14-384",
+            repo_id=cfg.vit_model_type,
             filename="model.safetensors",
             # endpoint="https://modelscope.cn/hub"
             )
