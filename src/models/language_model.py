@@ -4,13 +4,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 from src.models.layers import RMSNorm, LlamaMLP, GroupedQueryAttention
 from src.models.position_embedding import RotaryEmbedding
 
 class LlamaBlock(nn.Module):
     # https://github.com/meta-llama/llama3/blob/main/llama/model.py#L222
-    def __init__(self, cfg:GPTConfig) -> None:
+    def __init__(self, cfg:LLMConfig) -> None:
         super().__init__()
         
         self.mlp=LlamaMLP(cfg)
@@ -50,7 +50,7 @@ class LlamaBlock(nn.Module):
 
 class LlamaTransformer(nn.Module):
     # https://github.com/meta-llama/llama3/blob/main/llama/model.py#L251
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         
         self.lm_use_tokens=cfg.lm_use_tokens
@@ -60,7 +60,7 @@ class LlamaTransformer(nn.Module):
         
         self.rotary_embd=RotaryEmbedding(cfg)
         
-        self.blocks=nn.ModuleList([LlamaBlock(cfg) for _ in range(cfg.n_layer)])
+        self.blocks=nn.ModuleList([LlamaBlock(cfg) for _ in range(cfg.n_layers)])
         
         self.norm=RMSNorm(cfg)
         
@@ -194,7 +194,7 @@ class LlamaTransformer(nn.Module):
         return generated_outputs
     
     @classmethod
-    def from_pretrained(cls,cfg: GPTConfig):
+    def from_pretrained(cls,cfg: LLMConfig):
         from transformers import AutoConfig
         from huggingface_hub import hf_hub_download
         import safetensors
@@ -203,7 +203,7 @@ class LlamaTransformer(nn.Module):
         from huggingface_hub.utils import EntryNotFoundError
         
         # Load the HuggingFace config
-        hf_config=AutoConfig.from_pretrained(cfg.model_type)
+        hf_config=AutoConfig.from_pretrained(cfg.lm_model_type)
         
         # Store original HF vocab size before we modify it
         original_vocab_size=hf_config.vocab_size
@@ -221,20 +221,20 @@ class LlamaTransformer(nn.Module):
             
         
         cfg.n_embd=hf_config.hidden_size
-        cfg.n_inner=hf_config.intermediate_size
+        cfg.n_intermediate=hf_config.intermediate_size
         cfg.layer_norm_epsilon=hf_config.rms_norm_eps
         cfg.rotary_emb_base=hf_config.rope_theta
         cfg.n_positions=hf_config.max_position_embeddings
         
-        cfg.n_head=hf_config.num_attention_heads
-        cfg.n_kv_head=hf_config.num_key_value_heads
+        cfg.n_heads=hf_config.num_attention_heads
+        cfg.n_kv_heads=hf_config.num_key_value_heads
         cfg.dropout=hf_config.num_hidden_layers
         
         # Create our model with potentially larger vocabulary
         model=cls(cfg)
         
         try:
-            index_path=hf_hub_download(repo_id=cfg.model_type,filename="model.safetensors.index.json")
+            index_path=hf_hub_download(repo_id=cfg.lm_model_type,filename="model.safetensors.index.json")
             
             with open(index_path,'r') as f:
                 index=json.load(f)
@@ -243,10 +243,10 @@ class LlamaTransformer(nn.Module):
             safetensors_filenames=sorted(list(set(index['weight_map'].values())))
             
             # Download all the sharded files
-            safetensors_files=[hf_hub_download(repo_id=cfg.model_type,filename=fn) for fn in safetensors_filenames]
+            safetensors_files=[hf_hub_download(repo_id=cfg.lm_model_type,filename=fn) for fn in safetensors_filenames]
             
         except EntryNotFoundError:
-            safetensors_files=[hf_hub_download(repo_id=cfg.model_type,filename='model.safetensors')]
+            safetensors_files=[hf_hub_download(repo_id=cfg.lm_model_type,filename='model.safetensors')]
         
         sd=model.state_dict()
         
@@ -255,7 +255,7 @@ class LlamaTransformer(nn.Module):
             "model.norm.weight":"norm.weight"
         }
         
-        for i in range(cfg.n_layer):
+        for i in range(cfg.n_layers):
             layer_prefix=f'model.layers.{i}.'
             block_prefix=f'blocks.{i}.'
             
@@ -339,5 +339,5 @@ class LlamaTransformer(nn.Module):
             model.head.weight = model.token_embedding.weight
             # print("Tied token embedding and LM head weights")
         
-        print(f"Successfully loaded {cfg.model_type} weights from safetensors. Model has {sum(p.numel() for p in model.parameters()):,} parameters.")
+        print(f"Successfully loaded {cfg.lm_model_type} weights from safetensors. Model has {sum(p.numel() for p in model.parameters()):,} parameters.")
         return model

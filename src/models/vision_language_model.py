@@ -3,6 +3,7 @@ import os
 import json
 import tempfile
 from dataclasses import asdict
+from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -14,11 +15,11 @@ from src.models.vision_transformer import ViT
 from src.models.language_model import LlamaTransformer
 from src.models.modality_projector import ModalityProjector
 
-from src.models.config import GPTConfig,SigLIPConfig
+from src.models.config import LLMConfig,VLMConfig
 from src.data.processors import get_tokenizer
 
 class VisionLanguageModel(nn.Module):
-    def __init__(self,cfg:SigLIPConfig,load_backbone=True):
+    def __init__(self,cfg:VLMConfig,load_backbone=True):
         super().__init__()
         
         self.cfg=cfg
@@ -227,7 +228,7 @@ class VisionLanguageModel(nn.Module):
 
         # Load config
         with open(config_path, "r") as f:
-            cfg = SigLIPConfig(**json.load(f))
+            cfg = VLMConfig(**json.load(f))
 
         # Initialize model without loading the backbone
         model = cls(cfg, load_backbone=False)

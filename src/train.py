@@ -26,10 +26,10 @@ import torch
 import torch.distributed as dist
 
 from src.models.layers import Linear
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 from models.gpt import GPT
 from data.datasets import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
-from common.distributed import compute_init, compute_cleanup,autodetect_device_type,get_peak_flops, COMPUTE_DTYPE, COMPUTE_DTYPE_REASON, is_ddp_initialized
+from trainer.distributed import compute_init, compute_cleanup,autodetect_device_type,get_peak_flops, COMPUTE_DTYPE, COMPUTE_DTYPE_REASON, is_ddp_initialized
 from common.logger import  print0, DummySwanLab, print_banner
 
 from common.file_os import get_base_dir
@@ -138,9 +138,9 @@ def build_model_meta(depth):
     base_dim = depth * args.aspect_ratio
     model_dim = ((base_dim + args.head_dim - 1) // args.head_dim) * args.head_dim
     num_heads = model_dim // args.head_dim
-    config = GPTConfig(
+    config = LLMConfig(
         sequence_len=args.max_seq_len, vocab_size=vocab_size,
-        n_layer=depth, n_head=num_heads, n_kv_head=num_heads, n_embd=model_dim,
+        n_layers=depth, n_heads=num_heads, n_kv_heads=num_heads, n_embd=model_dim,
         window_pattern=args.window_pattern,
     )
     with torch.device("meta"):

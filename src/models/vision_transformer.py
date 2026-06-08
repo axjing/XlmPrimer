@@ -3,17 +3,17 @@ from typing import Any
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.config import SigLIPConfig
+from src.models.config import VLMConfig
 
 class ViTPatchEmbeddings(nn.Module):
     # Ref:[SigLIP](https://github.com/huggingface/transformers/blob/main/src/transformers/models/siglip/modeling_siglip.py#L245)
-    def __init__(self,cfg:SigLIPConfig):
+    def __init__(self,cfg:VLMConfig):
         super().__init__()
-        self.n_embd=cfg.n_embd
+        self.n_embd=cfg.vit_n_embd
         self.image_size=cfg.image_size
         self.patch_size=cfg.patch_size
         self.n_patch=(self.image_size//self.patch_size)**2
-        self.n_channel=cfg.n_channel
+        self.n_channel=cfg.n_channels
         
         self.cls_flag=cfg.vit_cls_flag
         
@@ -51,16 +51,16 @@ class ViTPatchEmbeddings(nn.Module):
 class ViTMultiHeadAttention(nn.Module):
     # https://github.com/huggingface/transformers/blob/main/src/transformers/models/siglip/modeling_siglip.py#L381
     # https://github.com/karpathy/nanoGPT/blob/master/model.py#L29
-    def __init__(self,cfg: SigLIPConfig):
+    def __init__(self,cfg: VLMConfig):
         super().__init__()
         
-        self.n_head=cfg.n_head
-        self.n_embd=cfg.n_embd
+        self.n_head=cfg.vit_n_heads
+        self.n_embd=cfg.vit_n_embd
         assert self.n_embd % self.n_head==0, f"embd dim must be divisible by n_head,current:n_embed % n_head={self.n_embd}%{self.n_head}"
         
         self.head_dim=self.n_embd//self.n_head
         
-        self.droput =cfg.attention_dropout
+        self.droput =cfg.vit_pdropout
         
         # Combined projected for all heads
         self.c_attn=nn.Linear(self.n_embd,3*self.n_embd,bias=True)
@@ -110,12 +110,12 @@ class ViTMultiHeadAttention(nn.Module):
     
 class ViTMLP(nn.Module):
     # https://github.com/huggingface/transformers/blob/main/src/transformers/models/siglip/modeling_siglip.py#L453
-    def __init__(self,cfg: SigLIPConfig):
+    def __init__(self,cfg: VLMConfig):
         super().__init__()
         self.activate_fn=nn.GELU(approximate='tanh')
-        self.fc1=nn.Linear(cfg.n_embd,cfg.n_inner)
-        self.fc2=nn.Linear(cfg.n_inner,cfg.n_embd)
-        self.dropout=nn.Dropout(cfg.attention_dropout)
+        self.fc1=nn.Linear(cfg.vit_n_embd,cfg.vit_n_intermediate)
+        self.fc2=nn.Linear(cfg.vit_n_intermediate,cfg.vit_n_embd)
+        self.dropout=nn.Dropout(cfg.vit_pdropout)
         
     def forward(self,x: torch.Tensor):
         x=self.fc1(x)
@@ -125,12 +125,12 @@ class ViTMLP(nn.Module):
         return x
     
 class ViTBlock(nn.Module):
-    def __init__(self, cfg: SigLIPConfig) -> None:
+    def __init__(self, cfg: VLMConfig) -> None:
         super().__init__()
         
-        self.ln1=nn.LayerNorm(cfg.n_embd,eps=cfg.layer_norm_eps)
+        self.ln1=nn.LayerNorm(cfg.vit_n_embd,eps=cfg.vit_layernorm_eps)
         self.attn=ViTMultiHeadAttention(cfg)
-        self.ln2=nn.LayerNorm(cfg.n_embd,eps=cfg.layer_norm_eps)
+        self.ln2=nn.LayerNorm(cfg.vit_n_embd,eps=cfg.vit_layernorm_eps)
         self.mlp=ViTMLP(cfg)
         
     def forward(self,x: torch.Tensor):
@@ -142,7 +142,7 @@ class ViTBlock(nn.Module):
         return x
     
 class ViT(nn.Module):
-    def __init__(self,cfg: SigLIPConfig):
+    def __init__(self,cfg: VLMConfig):
         super().__init__()
         
         self.cfg=cfg
@@ -150,9 +150,9 @@ class ViT(nn.Module):
         self.patch_embedding=ViTPatchEmbeddings(self.cfg)
         
         self.cls_flag=self.cfg.vit_cls_flag
-        self.dropout=nn.Dropout(self.cfg.attention_dropout)
-        self.blocks=nn.ModuleList([ViTBlock(self.cfg) for _ in range(self.cfg.n_layer)])
-        self.layer_norm = nn.LayerNorm(self.cfg.n_embd, eps=self.cfg.layer_norm_eps)
+        self.dropout=nn.Dropout(self.cfg.vit_pdropout)
+        self.blocks=nn.ModuleList([ViTBlock(self.cfg) for _ in range(self.cfg.vit_n_layers)])
+        self.layer_norm = nn.LayerNorm(self.cfg.n_embd, eps=self.cfg.vit_layernorm_eps)
         
         self.apply(self.__init_weights)
         
@@ -182,22 +182,22 @@ class ViT(nn.Module):
         return x
     
     @classmethod
-    def from_pretrained(cls,cfg: SigLIPConfig):
+    def from_pretrained(cls,cfg: VLMConfig):
         from transformers import Siglip2VisionConfig
         from huggingface_hub import hf_hub_download
         import safetensors
         
         hf_config=Siglip2VisionConfig.from_pretrained("google/siglip-so400m-patch14-384",filename="model.safetensors")
 
-        cfg.attention_dropout=hf_config.attention_dropout
+        cfg.attn_pdrop=hf_config.attention_dropout
         cfg.n_embd=hf_config.hidden_size
         cfg.image_size=hf_config.image_size
-        cfg.n_inner=hf_config.intermediate_size
+        cfg.n_intermediate=hf_config.intermediate_size
         cfg.layer_norm_eps=hf_config.layer_norm_eps
-        cfg.n_head=hf_config.num_attention_heads
-        cfg.n_layer=hf_config.num_hidden_layers
+        cfg.n_heads=hf_config.num_attention_heads
+        cfg.n_layers=hf_config.num_hidden_layers
         cfg.patch_size=hf_config.patch_size
-        cfg.hidden_act=hf_config.hidden_act
+        cfg.activation_function=hf_config.hidden_act
         
         model=cls(cfg)
         safetensors_file=hf_hub_download(
@@ -214,7 +214,7 @@ class ViT(nn.Module):
             'vision_model.post_layernorm.weight': 'layer_norm.weight',
             'vision_model.post_layernorm.bias': 'layer_norm.bias',
         }
-        for i in range(cfg.n_layer):
+        for i in range(cfg.n_layers):
             # Layer norms
             mapping[f'vision_model.encoder.layers.{i}.layer_norm1.weight'] = f'blocks.{i}.ln1.weight'
             mapping[f'vision_model.encoder.layers.{i}.layer_norm1.bias'] = f'blocks.{i}.ln1.bias'
@@ -248,7 +248,7 @@ class ViT(nn.Module):
                         print(f"Warning: Key {our_key} not found in model state dict")
             
             # Manually handle QKV concatenation since our implementation combines Q, K, V into one
-            for i in range(model.cfg.n_layer):
+            for i in range(model.cfg.n_layers):
                 q_weight = f.get_tensor(f'vision_model.encoder.layers.{i}.self_attn.q_proj.weight')
                 k_weight = f.get_tensor(f'vision_model.encoder.layers.{i}.self_attn.k_proj.weight')
                 v_weight = f.get_tensor(f'vision_model.encoder.layers.{i}.self_attn.v_proj.weight')
@@ -263,13 +263,13 @@ class ViT(nn.Module):
                 sd[f'blocks.{i}.attn.c_attn.bias'].copy_(qkv_bias)
         
         model.load_state_dict(sd)
-        print(f"Successfully loaded {cfg.model_type} weights from safetensors. Model has {sum(p.numel() for p in model.parameters()):,} parameters.")
+        print(f"Successfully loaded {cfg.vit_model_type} weights from safetensors. Model has {sum(p.numel() for p in model.parameters()):,} parameters.")
         return model
         
     
 if __name__=="__main__":
     print("...")
-    cfg=SigLIPConfig()
+    cfg=VLMConfig()
     vit_multi_attn=ViTMultiHeadAttention(cfg)
     
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -281,7 +281,7 @@ if __name__=="__main__":
     # print(y.shape)
     
 
-    sigclip_config=SigLIPConfig()
+    sigclip_config=VLMConfig()
     vit=ViT(sigclip_config)
     vit=vit.from_pretrained(sigclip_config).to(device=device)
     image_rand=torch.rand((1,3,384,384)).to(device)

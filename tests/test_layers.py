@@ -8,7 +8,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.layers import GroupedQueryAttention
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 from src.models.position_embedding import RotaryEmbedding
 
 
@@ -17,10 +17,10 @@ def test_grouped_query_attention():
     print("Testing GroupedQueryAttention...")
     
     # Create config
-    cfg = GPTConfig(
+    cfg = LLMConfig(
         n_embd=768,
-        n_head=12,
-        n_kv_head=4,  # Grouped Query Attention: 12 query heads, 4 key-value heads
+        n_heads=12,
+        n_kv_heads=4,  # Grouped Query Attention: 12 query heads, 4 key-value heads
         n_positions=1024,
         dropout=0.0,
         attn_pdrop=0.0,
@@ -57,7 +57,7 @@ def test_grouped_query_attention():
     
     # Verify output shape
     assert output.shape == x.shape, f"Output shape mismatch: {output.shape} vs {x.shape}"
-    assert cache['key'].shape == (batch_size, cfg.n_kv_head, seq_len, cfg.n_embd // cfg.n_head), \
+    assert cache['key'].shape == (batch_size, cfg.n_kv_heads, seq_len, cfg.n_embd // cfg.n_heads), \
         f"Cache key shape mismatch: {cache['key'].shape}"
     print("  ✓ Prefill mode test passed!")
     
@@ -75,7 +75,7 @@ def test_grouped_query_attention():
     
     # Verify output shape
     assert output_decode.shape == x_decode.shape, f"Decode output shape mismatch: {output_decode.shape} vs {x_decode.shape}"
-    assert cache_update['key'].shape == (batch_size, cfg.n_kv_head, seq_len + decode_seq_len, cfg.n_embd // cfg.n_head), \
+    assert cache_update['key'].shape == (batch_size, cfg.n_kv_heads, seq_len + decode_seq_len, cfg.n_embd // cfg.n_heads), \
         f"Updated cache key shape mismatch: {cache_update['key'].shape}"
     print("  ✓ Decode mode test passed!")
     
@@ -92,10 +92,10 @@ def test_grouped_query_attention():
     
     # Test with different configurations
     print(f"\nTesting with different n_kv_head configurations...")
-    cfg2 = GPTConfig(
+    cfg2 = LLMConfig(
         n_embd=512,
-        n_head=8,
-        n_kv_head=2,  # 8 query heads, 2 key-value heads (4 groups)
+        n_heads=8,
+        n_kv_heads=2,  # 8 query heads, 2 key-value heads (4 groups)
         n_positions=512,
         dropout=0.1,
         rotary_emb_base=10000.0,

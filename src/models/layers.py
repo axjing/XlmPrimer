@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 from src.models.position_embedding import apply_rotary_postision_embd
 
 
@@ -102,7 +102,7 @@ class RMSNorm(nn.Module):
             - lm_rms_eps (float): A small constant to avoid division by zero.
     """
     
-    def __init__(self,cfg:GPTConfig):
+    def __init__(self,cfg:LLMConfig):
         super().__init__()
         self.weight=nn.Parameter(torch.ones(cfg.n_embd))
         self.eps=cfg.layer_norm_epsilon
@@ -125,13 +125,13 @@ class RMSNorm(nn.Module):
 
 class CausalSelfAttention(nn.Module):
 
-    def __init__(self, cfg: GPTConfig,is_cross_attention:bool=False,ctrl_flash:bool=True):
+    def __init__(self, cfg: LLMConfig,is_cross_attention:bool=False,ctrl_flash:bool=True):
         super().__init__()
         self.is_cross_attention=is_cross_attention
         
         self.config=cfg
         self.n_embd=cfg.n_embd
-        self.n_head=cfg.n_head
+        self.n_head=cfg.n_heads
         self.head_dim=self.n_embd//self.n_head
         self.split_size = self.n_embd
         if self.head_dim*self.n_head!=self.n_embd:
@@ -224,10 +224,10 @@ class GroupedQueryAttention(nn.Module):
             - lm_dropout (float): Dropout rate.
     """
     
-    def __init__(self, cfg: GPTConfig) -> None:
+    def __init__(self, cfg: LLMConfig) -> None:
         super().__init__()
-        self.n_head=cfg.n_head
-        self.n_kv_head=cfg.n_kv_head
+        self.n_head=cfg.n_heads
+        self.n_kv_head=cfg.n_kv_heads
         self.n_embd=cfg.n_embd
         self.dropout=cfg.dropout
         
@@ -366,10 +366,10 @@ class LlamaMLP(nn.Module):
         up_proj (nn.Linear): Linear projection for upscaling pathway.
         down_proj (nn.Linear): Linear projection for downscaling back to embedding dim.
     """
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         self.n_embd=cfg.n_embd
-        self.n_inner=cfg.n_inner
+        self.n_inner=cfg.n_intermediate
         
         self.activation_fn=F.silu # cfg.activation_function
         self.gate_proj = nn.Linear(self.n_embd, self.n_inner, bias=False)
@@ -395,7 +395,7 @@ class LlamaMLP(nn.Module):
 
 class MLP(nn.Module):
     """MLP 层"""
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         
         self.c_fc=Conv1D(cfg.n_embd,cfg.n_embd*4)
@@ -412,7 +412,7 @@ class MLP(nn.Module):
     
 class Block(nn.Module):
     """Block 层"""
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         self.ln_1=LayerNorm(cfg.n_embd,bias=cfg.bias)
         self.attn=CausalSelfAttention(cfg)

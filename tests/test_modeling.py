@@ -20,7 +20,7 @@ from src.models.gpt import (
     Block,
     GPT
 )
-from models.config import GPTConfig
+from models.config import LLMConfig
 
 def test_conv1d():
     """测试Conv1D层"""
@@ -86,7 +86,7 @@ def test_causal_attention():
     """测试因果自注意力"""
     print("=== 测试因果自注意力 ===")
     
-    config = GPTConfig(n_embd=64, n_head=2, n_positions=32)
+    config = LLMConfig(n_embd=64, n_heads=2, n_positions=32)
     attn = CausalSelfAttention(config, ctrl_flash=False)  # 使用慢速注意力
     
     # 测试前向传播
@@ -113,7 +113,7 @@ def test_mlp():
     """测试MLP层"""
     print("=== 测试MLP层 ===")
     
-    config = GPTConfig(n_embd=64)
+    config = LLMConfig(n_embd=64)
     mlp = MLP(config)
     
     # 测试前向传播
@@ -129,7 +129,7 @@ def test_block():
     """测试Transformer块"""
     print("=== 测试Transformer块 ===")
     
-    config = GPTConfig(n_embd=768)
+    config = LLMConfig(n_embd=768)
     block = Block(config)
     
     # 测试前向传播
@@ -146,11 +146,11 @@ def test_gpt_model():
     print("=== 测试完整GPT模型 ===")
     
     # 创建小型配置
-    config = GPTConfig(
+    config = LLMConfig(
         vocab_size=100,
         n_embd=64,
-        n_layer=2,
-        n_head=2,
+        n_layers=2,
+        n_heads=2,
         n_positions=32
     )
     
@@ -187,7 +187,7 @@ def test_optimizer():
     """测试优化器配置"""
     print("=== 测试优化器配置 ===")
     
-    config = GPTConfig(n_embd=768, n_layer=12)
+    config = LLMConfig(n_embd=768, n_layers=12)
     model = GPT(config)
     
     optimizer = model.configure_optimizers(
@@ -211,11 +211,11 @@ def test_gpt_estimate_mfu():
     """测试MFU估算"""
     print("=== 测试MFU估算 ===")
     
-    config = GPTConfig(
+    config = LLMConfig(
         vocab_size=100,
         n_embd=64,
-        n_layer=2,
-        n_head=2,
+        n_layers=2,
+        n_heads=2,
         n_positions=32
     )
     
@@ -254,15 +254,15 @@ def test_gpt_from_pretrained_initialization():
             config_args['n_positions'] = 1024
             config_args['bias'] = True
             
-            config = GPTConfig(**config_args)
+            config = LLMConfig(**config_args)
             model = GPT(config)
             
             # 验证配置参数
             assert model.config.vocab_size == 50257
             assert model.config.n_positions == 1024
             assert model.config.bias == True
-            assert model.config.n_layer == config_args['n_layer']
-            assert model.config.n_head == config_args['n_head']
+            assert model.config.n_layers == config_args['n_layer']
+            assert model.config.n_heads == config_args['n_head']
             assert model.config.n_embd == config_args['n_embd']
             
             print(f"✓ {model_type} 初始化测试通过")
@@ -288,7 +288,7 @@ def test_gpt_from_pretrained_override_args():
     config_args['bias'] = True
     config_args['dropout'] = override_args['dropout']  # 覆盖dropout
     
-    config = GPTConfig(**config_args)
+    config = LLMConfig(**config_args)
     model = GPT(config)
     
     # 验证dropout参数被正确覆盖
@@ -302,11 +302,11 @@ def test_gpt_from_pretrained_state_dict_keys():
     print("=== 测试from_pretrained方法的状态字典键匹配 ===")
     
     # 创建一个小型模型来测试状态字典结构
-    config = GPTConfig(
+    config = LLMConfig(
         vocab_size=100,
         n_embd=64,
-        n_layer=2,
-        n_head=2,
+        n_layers=2,
+        n_heads=2,
         n_positions=32
     )
     
@@ -353,15 +353,15 @@ def test_gpt_from_pretrained_integration():
     config_args['n_positions'] = 1024
     config_args['bias'] = True
     
-    config = GPTConfig(**config_args)
+    config = LLMConfig(**config_args)
     model = GPT(config)
     
     # 验证GPT-2的标准配置
     assert model.config.vocab_size == 50257
     assert model.config.n_positions == 1024
     assert model.config.bias == True
-    assert model.config.n_layer == 12
-    assert model.config.n_head == 12
+    assert model.config.n_layers == 12
+    assert model.config.n_heads == 12
     assert model.config.n_embd == 768
     
     print("GPT-2标准配置验证通过")

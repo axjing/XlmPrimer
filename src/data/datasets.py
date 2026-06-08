@@ -1,6 +1,7 @@
 import os
 import argparse
 import time
+from typing import Any
 import requests
 import logging
 import pyarrow.parquet as pq
@@ -16,8 +17,8 @@ from torch.utils.data import Dataset
 from src.data.processors import get_image_string
 
 
-from common.file_os import get_base_dir
-from common.distributed import get_dist_info
+from src.common.file_os import get_base_dir
+from src.trainer.distributed import get_dist_info
 
 
 
@@ -457,6 +458,82 @@ class VQADataset(DatasetBase):  # Visual Question Answering Dataset
         labels[-1] = -100 # Last token has no target
         
         return labels
+    
+class CollatorBase(object):
+    def __init__(self,tokenizer) -> None:
+        self.tokenizer=tokenizer
+        
+        self.data_field={"input_ids": [], "labels": [], "attention_mask": [], "images": []}
+
+        
+    def _pad_batch(self,batch:dict,max_length:int):
+        batch['input_ids']=[torch.nn.functional.pad(ids,(max_length-len(ids),0),value=self.tokenizer.pad_token_ids) for ids in batch['input_ids']]
+        batch['labels']=[torch.nn.functional.pad(labels,(max_length-len(labels),0),value=self.tokenizer.pad_token_id) for labels in batch['labels']]
+        batch['attention_mask']=[torch.nn.functional.pad(attention_mask,(max_length-len(attention_mask),0),value=0) for attention_mask in batch['attention_mask']]
+    
+    def prepare_batch(self,batch,max_lenght=None):
+        # 1. Hadndle empty
+        if not batch:
+            return self.data_field
+        
+        # 2. Drop None rows
+        batch=[s for s in batch if s is not None]
+        if not batch:
+            return self.data_field
+        
+        # 3. batch is a list of dicts, each containing 'input_ids', 'attention_mask', 'labels', 'images'
+        # let's convert it to a dict of lists of tensors
+        batch={k:[item[k] for item in batch] for k in batch[0]}
+        
+        if max_lenght is not None:
+            batch=self._discard_samples_that_are_too_long(batch,max_lenght)
+            
+        if len(batch['input_ids'])==0:
+            return batch
+        
+        # 4. Pad samples to max_length
+        if max_lenght is not None:
+            max_len=max_lenght
+        else:
+            max_len=max(map(len,batch['input_ids']))
+        
+        self._pad_batch(batch,max_len)
+        
+        return {
+            'input_ids':torch.stack(batch['input_ids']),
+            'attention_mask':torch.stack(batch['attention_mask']),
+            'images':batch['images'],
+            'labels':batch['labels'],
+        }
+            
+    
+    def _discard_samples_that_are_too_long(self,batch,max_length:int):
+        filtered=[
+            (ids,label,attn_mask,image)
+            for ids,label,attn_mask,image in zip(batch['input_ids'],batch['labels'],batch['attention_mask'],batch['images']) if len(ids) <=max_length
+        ]
+        
+        if not filtered:
+            return self.data_field
+        
+        batch_token_ids,batch_labels,batch_attention_mask,batch_images=zip(*filtered)
+        
+        return{'input_ids':list(batch_token_ids),'labels':list(batch_labels),'attention_mask':list(batch_attention_mask),'images':list(batch_images)}
+        
+class VQACollator(CollatorBase) :
+    def __init__(self, tokenizer,max_length) -> None:
+        self.max_length=max_length
+        super().__init__(tokenizer)
+        
+    def _pad_batch(self, batch: dict, max_length: int):
+        # 重新改写，将标签的填充值设为 -100，这样损失函数会自动忽略该值。
+        batch["input_ids"] = [torch.nn.functional.pad(ids, (max_length - len(ids), 0), value=self.tokenizer.pad_token_id) for ids in batch["input_ids"]]
+        batch["labels"]    = [torch.nn.functional.pad(labels, (max_length - len(labels), 0), value=-100) for labels in batch["labels"]]
+        batch["attention_mask"] = [torch.nn.functional.pad(attention_mask, (max_length - len(attention_mask), 0), value=0) for attention_mask in batch["attention_mask"]]
+    
+    def __call__(self, batch:dict) -> Any:
+        batch=self.prepare_batch(batch,max_lenght=self.max_length)
+        return batch
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download pretraining dataset shards")
     parser.add_argument("-n", "--num-files", type=int, default=-1, help="Number of train shards to download (default: -1), -1 = disable")

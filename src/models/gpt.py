@@ -5,12 +5,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from models.config import GPTConfig
+from models.config import LLMConfig
 from src.models.layers import CausalSelfAttention,MLP,LayerNorm
     
 class Block(nn.Module):
     """Block 层"""
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         self.ln_1=LayerNorm(cfg.n_embd,bias=cfg.bias)
         self.attn=CausalSelfAttention(cfg)
@@ -34,14 +34,14 @@ class Block(nn.Module):
         
 class GPT(nn.Module):
     """GPT 模型"""
-    def __init__(self,cfg: GPTConfig):
+    def __init__(self,cfg: LLMConfig):
         super().__init__()
         self.config=cfg
         
         self.wte=nn.Embedding(cfg.vocab_size,cfg.n_embd) # token embedding
         self.wpe=nn.Embedding(cfg.n_positions,cfg.n_embd) # position embedding
         self.drop=nn.Dropout(cfg.attn_pdrop)
-        self.h=nn.ModuleList([Block(cfg) for _ in range(cfg.n_layer)])
+        self.h=nn.ModuleList([Block(cfg) for _ in range(cfg.n_layers)])
         self.ln_f=LayerNorm(cfg.n_embd,bias=cfg.bias)
         # self.transformer=nn.ModuleDict(dict(
         #     wte=self.wte,
@@ -60,7 +60,7 @@ class GPT(nn.Module):
         # 按照GPT-2论文所述，对残差投影应用特殊的缩放初始化
         for pn,p in self.named_parameters():
             if pn.endswith("c_proj.weight"):
-                nn.init.normal_(p,mean=0.0,std=0.02*(2*cfg.n_layer)**(-0.5))
+                nn.init.normal_(p,mean=0.0,std=0.02*(2*cfg.n_layers)**(-0.5))
                 
         # report number of parameters
         print(f"Number of parameters:  {self.get_num_params()/1e6 :.2f}M")
@@ -176,7 +176,7 @@ class GPT(nn.Module):
             print(f"overriding dropout rate to {override_args['dropout']}")
             config_args['dropout'] = override_args['dropout']
         # create a from-scratch initialized minGPT model
-        config = GPTConfig(**config_args)
+        config = LLMConfig(**config_args)
         model = GPT(config)
         sd = model.state_dict()
         sd_keys = sd.keys()
@@ -240,7 +240,7 @@ class GPT(nn.Module):
         # see PaLM paper Appendix B as ref: https://arxiv.org/abs/2204.02311
         N = self.get_num_params()
         cfg = self.config
-        L, H, Q, T = cfg.n_layer, cfg.n_head, cfg.n_embd//cfg.n_head, cfg.n_positions
+        L, H, Q, T = cfg.n_layers, cfg.n_heads, cfg.n_embd//cfg.n_heads, cfg.n_positions
         flops_per_token = 6*N + 12*L*H*Q*T
         flops_per_fwdbwd = flops_per_token * T
         flops_per_iter = flops_per_fwdbwd * fwdbwd_per_iter

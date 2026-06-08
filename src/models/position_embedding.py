@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 
 class RotaryEmbedding(nn.Module):
     """
@@ -23,12 +23,12 @@ class RotaryEmbedding(nn.Module):
             - attn_scaling (float)：注意力缩放系数
     """
     
-    def __init__(self, cfg:GPTConfig) -> None:
+    def __init__(self, cfg:LLMConfig) -> None:
         super().__init__()
         
-        assert cfg.n_embd% cfg.n_head==0, "Hidden dimension must be divisible by number of heads"
+        assert cfg.n_embd% cfg.n_heads==0, "Hidden dimension must be divisible by number of heads"
         
-        self.head_dim=cfg.n_embd//cfg.n_head # 每个head的维度
+        self.head_dim=cfg.n_embd//cfg.n_heads # 每个head的维度
         
         self.r_embd_base=cfg.rotary_emb_base
         self.max_seg_len=cfg.n_positions

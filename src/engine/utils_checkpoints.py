@@ -9,7 +9,7 @@ import logging
 import torch
 
 from common.file_os import get_base_dir
-from models.gpt import GPT, GPTConfig
+from models.gpt import GPT, LLMConfig
 from common.tokenizer import get_tokenizer
 from common.logger import setup_default_logging
 
@@ -95,7 +95,7 @@ def build_model(checkpoint_dir, step, device, phase):
     model_config_kwargs = meta_data["model_config"]
     _patch_missing_config_keys(model_config_kwargs)
     log0(f"Building model with config: {model_config_kwargs}")
-    model_config = GPTConfig(**model_config_kwargs)
+    model_config = LLMConfig(**model_config_kwargs)
     _patch_missing_keys(model_data, model_config)
     with torch.device("meta"):
         model = GPT(model_config)

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from models.config import GPTConfig
+from models.config import LLMConfig
 from src.model import GPT
 from src.trainer import Trainer
 from src.inference import TextGenerator, ChatBot
@@ -30,12 +30,12 @@ def example_training():
     print("=== GPT模型训练示例 ===")
     
     # 创建配置
-    config = GPTConfig(
+    config = LLMConfig(
         vocab_size=1000,
         n_positions=128,
         n_embd=64,
-        n_layer=4,
-        n_head=4,
+        n_layers=4,
+        n_heads=4,
         dropout=0.1,
     )
     

@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.models.language_model import LlamaBlock, LlamaTransformer
-from src.models.config import GPTConfig
+from src.models.config import LLMConfig
 
 
 class TestLlamaBlock(unittest.TestCase):
@@ -16,11 +16,11 @@ class TestLlamaBlock(unittest.TestCase):
 
     def setUp(self):
         """设置测试配置和模型"""
-        self.cfg = GPTConfig(
+        self.cfg = LLMConfig(
             n_embd=64,
-            n_layer=2,
-            n_head=4,
-            n_kv_head=2,
+            n_layers=2,
+            n_heads=4,
+            n_kv_heads=2,
             vocab_size=1000,
             lm_use_tokens=True,
             lm_tie_weights=True
@@ -118,11 +118,11 @@ class TestLlamaTransformer(unittest.TestCase):
 
     def setUp(self):
         """设置测试配置和模型"""
-        self.cfg = GPTConfig(
+        self.cfg = LLMConfig(
             n_embd=64,
-            n_layer=2,
-            n_head=4,
-            n_kv_head=2,
+            n_layers=2,
+            n_heads=4,
+            n_kv_heads=2,
             vocab_size=1000,
             lm_use_tokens=True,
             lm_tie_weights=True,
@@ -153,16 +153,16 @@ class TestLlamaTransformer(unittest.TestCase):
         # 验证KV缓存列表长度等于层数
         print(f"KV缓存层数: {len(kv_cache)}")
         print(f"每层KV缓存结构: key={kv_cache[0]['key'].shape}, value={kv_cache[0]['value'].shape}")
-        self.assertEqual(len(kv_cache), self.cfg.n_layer)
+        self.assertEqual(len(kv_cache), self.cfg.n_layers)
         print("✓ LlamaTransformer token输入前向传播测试通过")
 
     def test_forward_pass_with_embeddings(self):
         """测试使用embedding输入的前向传播"""
-        cfg_no_tokens = GPTConfig(
+        cfg_no_tokens = LLMConfig(
             n_embd=64,
-            n_layer=2,
-            n_head=4,
-            n_kv_head=2,
+            n_layers=2,
+            n_heads=4,
+            n_kv_heads=2,
             vocab_size=1000,
             lm_use_tokens=False,  # 使用embedding输入
             lm_tie_weights=True,
@@ -232,11 +232,11 @@ class TestLlamaTransformer(unittest.TestCase):
             self.assertIs(self.model.head.weight, self.model.token_embedding.weight)
         else:
             # 创建不绑定权重的模型
-            cfg_no_tie = GPTConfig(
+            cfg_no_tie = LLMConfig(
                 n_embd=64,
-                n_layer=2,
-                n_head=4,
-                n_kv_head=2,
+                n_layers=2,
+                n_heads=4,
+                n_kv_heads=2,
                 vocab_size=1000,
                 lm_use_tokens=True,
                 lm_tie_weights=False,
@@ -271,12 +271,12 @@ class TestLlamaTransformer(unittest.TestCase):
         
         # 使用一个小的开源模型进行测试
         # TinyLlama/TinyLlama-1.1B-Chat-v1.0 是一个相对较小的模型
-        cfg = GPTConfig(
+        cfg = LLMConfig(
             lm_use_tokens=True,
             lm_tie_weights=True
         )
-        cfg.model_type = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-        print(f"模型类型: {cfg.model_type}")
+        cfg.lm_model_type = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        print(f"模型类型: {cfg.lm_model_type}")
         
         try:
             # 加载预训练模型
@@ -290,9 +290,9 @@ class TestLlamaTransformer(unittest.TestCase):
             # 打印模型配置信息
             print(f"\n模型配置信息:")
             print(f"  - 隐藏层维度: {cfg.n_embd}")
-            print(f"  - 层数: {cfg.n_layer}")
-            print(f"  - 注意力头数: {cfg.n_head}")
-            print(f"  - KV头数: {cfg.n_kv_head}")
+            print(f"  - 层数: {cfg.n_layers}")
+            print(f"  - 注意力头数: {cfg.n_heads}")
+            print(f"  - KV头数: {cfg.n_kv_heads}")
             print(f"  - 词汇表大小: {cfg.vocab_size}")
             print(f"  - 参数总数: {sum(p.numel() for p in model.parameters()):,}")
             
@@ -314,7 +314,7 @@ class TestLlamaTransformer(unittest.TestCase):
             
             # 验证KV缓存
             print(f"KV缓存层数: {len(kv_cache)}")
-            self.assertEqual(len(kv_cache), cfg.n_layer)
+            self.assertEqual(len(kv_cache), cfg.n_layers)
             
             print("\n✓ LlamaTransformer from_pretrained方法测试通过")
             
@@ -327,12 +327,12 @@ class TestLlamaTransformer(unittest.TestCase):
         """测试从预训练模型加载时使用自定义词汇表大小"""
         import unittest
         
-        cfg = GPTConfig(
+        cfg = LLMConfig(
             vocab_size=50304,  # 使用比原始模型更大的词汇表
             lm_use_tokens=True,
             lm_tie_weights=True
         )
-        cfg.model_type = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+        cfg.lm_model_type = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
         
         try:
             model = LlamaTransformer.from_pretrained(cfg)

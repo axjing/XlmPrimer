@@ -18,7 +18,7 @@ import signal
 import warnings
 from contextlib import contextmanager
 from collections import deque
-from common.distributed import compute_init, autodetect_device_type
+from trainer.distributed import compute_init, autodetect_device_type
 from engine.utils_checkpoints import load_model
 
 # -----------------------------------------------------------------------------

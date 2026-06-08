@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
-from src.models.config import GPTConfig,SigLIPConfig
+from src.models.config import LLMConfig,VLMConfig
 class ModalityProjector(nn.Module):
-    def __init__(self,cfg:SigLIPConfig):
+    def __init__(self,cfg:VLMConfig):
         super().__init__()
         
         self.input_dim=cfg.vit_n_embd*(cfg.mp_pixel_shuffle_factor**2)

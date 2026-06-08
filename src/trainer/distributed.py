@@ -1,8 +1,59 @@
 import os
+from datetime import timedelta
 import torch
+import torch.nn as nn
 import torch.distributed as dist
 
 
+    
+def init_dist():
+    dist.init_process_group(backend='nccl',timeout=timedelta(minutes=30))
+    local_rank=int(os.environ['LOCAL_RANK'])
+    torch.cuda.set_device(local_rank)
+    # torch.cuda.manual_seed(0)
+    
+def destory_dist():
+    dist.destroy_process_group()
+    
+def is_dist():
+    return dist.is_available() and dist.is_initialized()
+
+def is_master():
+    return dist.get_rank()==0 if is_dist else True
+
+def get_world_size():
+    return dist.get_world_size() if is_dist() else 1
+
+def get_rank():
+    return dist.get_rank() if is_dist() else 0
+
+def dist_gather(obj):
+    """
+    无需分配临时CUDA缓冲区，从所有进程编号中收集**任意**可序列化对象。返回列表格式为[编号0对象、编号1对象……]。
+
+    若分布式训练模块（torch.distributed）未完成初始化，则仅返回当前单个进程编号对应的对象列表。
+    """
+    if not (dist.is_available() and dist.is_initialized()):
+        return [obj]
+    
+    result=[None] * dist.get_world_size()
+    dist.all_gather_object(result,obj,group=PG_CPU) # CUP path
+    
+    return result
+
+def dist_mean_scalar(x:float|int)->float:
+    if not (dist.is_available and dist.is_initialized):
+        return float(x)
+    
+    t=torch.tensor(x,device=torch.cuda.current_device(),dtype=torch.float32)
+    dist.all_reduce(t,op=dist.ReduceOp.SUM)
+    
+    t/=dist.get_world_size()
+    return t.item()
+
+def wrap_model(model):
+    local_rank=int(os.environ['LOCAL_RANK'])
+    return nn.parallel.DistributedDataParallel(model,device_ids=[local_rank])
 
 # The dtype used for compute (matmuls, activations). Master weights stay fp32 for optimizer precision.
 # Linear layers cast their weights to this dtype in forward, replacing torch.amp.autocast.
