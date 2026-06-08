@@ -1,4 +1,5 @@
-from dataclasses import dataclass,field
+import json
+from dataclasses import dataclass,field,asdict
 @dataclass
 class TrainConfig:
     lr_mp: float = 0.00512
@@ -31,3 +32,20 @@ class TrainConfig:
     lmms_eval_tasks: str = 'mmstar,mmmu_val,ocrbench,textvqa_val,docvqa_val,scienceqa,mme,infovqa_val,chartqa' # Pass additional task as one string, seperated by commas without spaces (e.g. 'mmstar,mmmu,ocrbench')
     lmms_eval_limit: float|None = None
     lmms_eval_batch_size: int = 2
+    def to_json(self,file_path:str=None,indent:int=4):
+        """
+        配置转JSON：可返回字符串 / 直接写入文件
+        :param file_path: 保存的文件路径，为None时仅返回字符串
+        :param indent: 格式化缩进
+        :return: file_path为None 返回JSON字符串；写入文件则返回None
+        """
+        
+        data_dict=asdict(self)
+        json_str=json.dumps(data_dict,ensure_ascii=False,indent=indent)
+        
+        if file_path:
+            with open(file_path,'w',encoding='utf-8') as f:
+                json.dump(data_dict,f,ensure_ascii=False,indent=indent)
+            print(f'>>> Json saved: {file_path}')
+        
+        return json_str

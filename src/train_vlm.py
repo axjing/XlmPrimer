@@ -690,15 +690,15 @@ def main():
         PG_CPU = dist.new_group(backend="gloo")   # host‑RAM, zero GPU allocations
 
     if is_master():
-        print("--- VLM Config ---")
+        print(">>> ---------- VLM Config ---------- <<<")
         print(vlm_cfg.to_json())
-        print("--- Train Config ---")
-        print(train_cfg)
+        print(">>> ---------- Train Config ---------- <<<")
+        print(train_cfg.to_json())
 
     train(train_cfg, vlm_cfg)
 
     if is_dist():
-        destroy_dist()
+        destory_dist()
 
 if __name__ == "__main__":
     main()
