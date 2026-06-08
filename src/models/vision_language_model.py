@@ -33,7 +33,7 @@ class VisionLanguageModel(nn.Module):
         self.MP=ModalityProjector(cfg)
         
         self.load_backbone=load_backbone
-        self.tokenizer=get_tokenizer(cfg.lm_tokenizer,cfg.vlm_extra_tokens,cfg.vlm_chat_template)
+        self.tokenizer=get_tokenizer(cfg.lm_tokenizer,cfg.vlm_extra_tokens,cfg.lm_chat_template)
         
     def _replace_img_tokens_with_embd(self,input_ids:torch.Tensor,token_embd:torch.Tensor,image_embd:torch.Tensor):
         """
