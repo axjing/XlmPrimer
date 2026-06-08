@@ -19,7 +19,7 @@ def is_dist():
     return dist.is_available() and dist.is_initialized()
 
 def is_master():
-    return dist.get_rank()==0 if is_dist else True
+    return dist.get_rank()==0 if is_dist() else True
 
 def get_world_size():
     return dist.get_world_size() if is_dist() else 1
