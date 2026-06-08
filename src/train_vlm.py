@@ -43,7 +43,7 @@ from src.data.processors import get_image_processor,get_tokenizer
 from src.models.config import VLMConfig
 from src.models.vision_language_model import VisionLanguageModel
 
-from src.trainer.distributed import is_dist,dist_gather,dist_mean_scalar,get_world_size, is_master,get_rank,wrap_model
+from src.trainer.distributed import is_dist,dist_gather,dist_mean_scalar,get_world_size, is_master,get_rank,wrap_model,init_dist
 from src.trainer.config import TrainConfig
 # 解决 Python PIL/Pillow 库打开部分 PNG 图片时报 Decompressed data too large（解压数据过大） 的报错，是处理超大文本块 PNG 的通用修复方案
 from PIL import PngImagePlugin
@@ -160,11 +160,27 @@ def get_dataloaders(train_cfg: TrainConfig,vlm_cfg: VLMConfig):
         train_cfg.formatting_min_rating,
     )
 
-    train_dataset = ConstantLengthDataset(train_dataset, infinite=False, max_sample_length=train_cfg.max_sample_length, seq_length=vlm_cfg.n_positions, num_of_sequences=train_cfg.batch_size*4, queue_size=8,
-                                        max_images_per_example=train_cfg.max_images_per_example, max_images_per_knapsack=train_cfg.max_images_per_knapsack)
+    train_dataset = ConstantLengthDataset(
+        train_dataset, 
+        infinite=False, 
+        max_sample_length=train_cfg.max_sample_length, 
+        seq_length=vlm_cfg.n_positions, 
+        num_of_sequences=train_cfg.batch_size*2, 
+        queue_size=2,
+        max_images_per_example=train_cfg.max_images_per_example, 
+        max_images_per_knapsack=train_cfg.max_images_per_knapsack
+    )
 
-    val_dataset = ConstantLengthDataset(val_dataset, infinite=False, max_sample_length=train_cfg.max_sample_length, seq_length=vlm_cfg.n_positions, num_of_sequences=train_cfg.batch_size*4, queue_size=8,
-                                        max_images_per_example=train_cfg.max_images_per_example, max_images_per_knapsack=train_cfg.max_images_per_knapsack)
+    val_dataset = ConstantLengthDataset(
+        val_dataset, 
+        infinite=False, 
+        max_sample_length=train_cfg.max_sample_length, 
+        seq_length=vlm_cfg.n_positions, 
+        num_of_sequences=train_cfg.batch_size*2, 
+        queue_size=2,
+        max_images_per_example=train_cfg.max_images_per_example, 
+        max_images_per_knapsack=train_cfg.max_images_per_knapsack
+    )
 
     # Create collators
     vqa_collator = VQACollator(tokenizer, vlm_cfg.n_positions)
@@ -178,7 +194,8 @@ def get_dataloaders(train_cfg: TrainConfig,vlm_cfg: VLMConfig):
         train_dataset,
         batch_size=train_cfg.batch_size,    # =per device BS in DDP
         collate_fn=vqa_collator,
-        num_workers=3,
+        num_workers=1,
+        timeout=3600,
         pin_memory=True,
         persistent_workers=False,
         drop_last=True,
@@ -191,6 +208,7 @@ def get_dataloaders(train_cfg: TrainConfig,vlm_cfg: VLMConfig):
         batch_size=train_cfg.batch_size,
         collate_fn=vqa_collator,
         num_workers=1,
+        timeout=3600,
         pin_memory=True,
         persistent_workers=False,
         drop_last=True,
@@ -202,9 +220,18 @@ def get_dataloaders(train_cfg: TrainConfig,vlm_cfg: VLMConfig):
     print("Warming up dataloaders...")   
     iter_train_loader = iter(train_loader)
     iter_val_loader = iter(val_loader)
-    next(iter_train_loader)
-    next(iter_val_loader)
-    print("Warmup complete.")
+    try:
+        next(iter_train_loader)
+        print(">>> Train loader warmup comlete...")
+    except Exception as e:
+        raise ValueError(f'Error warmup train loader: {e}')
+    
+    try:
+        next(iter_val_loader)
+        print(">>> Val loader warmup complete...")
+    except Exception as e:
+        raise ValueError(f'Error warmup val loader: {e}')
+        
 
     return train_loader, val_loader, iter_train_loader, iter_val_loader
 

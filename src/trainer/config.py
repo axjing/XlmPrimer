@@ -5,7 +5,7 @@ class TrainConfig:
     lr_vision_backbone: float = 5e-5 #0.0005 #
     lr_language_backbone: float = 5e-5 #0
     val_size: int = 50000
-    batch_size: int = 2
+    batch_size: int = 1
     gradient_accumulation_steps: int = 8
     max_grad_norm: float = 1.0
     eval_in_epochs: bool = True
@@ -14,6 +14,7 @@ class TrainConfig:
     max_training_steps: int = 40000
     max_images_per_example: int = 4
     max_images_per_knapsack: int = 18
+    # Should be close to n_positions to filter overly long samples
     max_sample_length: int = 4096
     compile: bool = False
     resume_from_vlm_checkpoint: bool = False # Indicate if the training should be resumed from a checkpoint of the whole VLM or you want to start from scratch
@@ -29,4 +30,4 @@ class TrainConfig:
     use_lmms_eval: bool = True # Use lmms-eval for evaluation
     lmms_eval_tasks: str = 'mmstar,mmmu_val,ocrbench,textvqa_val,docvqa_val,scienceqa,mme,infovqa_val,chartqa' # Pass additional task as one string, seperated by commas without spaces (e.g. 'mmstar,mmmu,ocrbench')
     lmms_eval_limit: float|None = None
-    lmms_eval_batch_size: int = 64
+    lmms_eval_batch_size: int = 2

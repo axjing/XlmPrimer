@@ -335,7 +335,7 @@ class DatasetBase(Dataset):
                     'content':random_string_5_letters,
                 }
             ],
-            tokenizer=False,
+            tokenize=False,
             add_special_tokens=False
         )
         random_string_location=random_string_chat_templated.find(random_string_5_letters)
@@ -363,7 +363,7 @@ class DatasetBase(Dataset):
         
         # Safety check to ensure no image tokens are persent in the text before adding them.
         for msg in messages:
-            if self.tokenizer.image_token in msg['context']:
+            if self.tokenizer.image_token in msg['content']:
                 logging.warning(f"Found and removed an image token in the {msg['role']} text before adding the image string.")
                 msg["content"] = msg["content"].replace(self.tokenizer.image_token, "")
             

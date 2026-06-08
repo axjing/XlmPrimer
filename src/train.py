@@ -27,18 +27,18 @@ import torch.distributed as dist
 
 from src.models.layers import Linear
 from src.models.config import LLMConfig
-from models.gpt import GPT
-from data.datasets import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
-from trainer.distributed import compute_init, compute_cleanup,autodetect_device_type,get_peak_flops, COMPUTE_DTYPE, COMPUTE_DTYPE_REASON, is_ddp_initialized
-from common.logger import  print0, DummySwanLab, print_banner
+from src.models.gpt import GPT
+from src.data.datasets import tokenizing_distributed_data_loader_bos_bestfit, tokenizing_distributed_data_loader_with_state_bos_bestfit
+from src.trainer.distributed import compute_init, compute_cleanup,autodetect_device_type,get_peak_flops, COMPUTE_DTYPE, COMPUTE_DTYPE_REASON, is_ddp_initialized
+from src.common.logger import  print0, DummySwanLab, print_banner
 
-from common.file_os import get_base_dir
-from common.tokenizer import get_tokenizer, get_token_bytes
-from engine.utils_checkpoints import save_checkpoint, load_checkpoint
-from evaluator.eval_loss import evaluate_bpb
-from engine.engine_inference import Engine
-from models.flash_attention import HAS_FA3
-from eval import evaluate_core
+from src.common.file_os import get_base_dir
+from src.common.tokenizer import get_tokenizer, get_token_bytes
+from src.engine.utils_checkpoints import save_checkpoint, load_checkpoint
+from src.evaluator.eval_loss import evaluate_bpb
+from src.engine.engine_inference import Engine
+from src.models.flash_attention import HAS_FA3
+from src.eval import evaluate_core
 print_banner()
 
 # -----------------------------------------------------------------------------

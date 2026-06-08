@@ -1,4 +1,5 @@
-from dataclasses import dataclass,field
+import json
+from dataclasses import dataclass,field,asdict
 
 @dataclass
 class LLMConfig:
@@ -64,6 +65,24 @@ class LLMConfig:
     lm_tokenizer:str="HuggingFaceTB/SmolLM2-360M-Instruct"
     lm_chat_template:str="{% for message in messages %}{{'<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>' + '\n'}}{% endfor %}{% if add_generation_prompt %}{{ '<|im_start|>assistant\n' }}{% endif %}"
     
+    def to_json(file_path:str=None,indent:int=4):
+      """
+      配置转JSON：可返回字符串 / 直接写入文件
+      :param file_path: 保存的文件路径，为None时仅返回字符串
+      :param indent: 格式化缩进
+      :return: file_path为None 返回JSON字符串；写入文件则返回None
+      """
+      
+      data_dict=asdict(self)
+      json_str=json.dumps(data_dict,ensure_ascii=False,indent=indent)
+      
+      if file_path:
+        with open(file_path,'w',encoding='utf-8') as f:
+          json.dump(data_dict,f,ensure_ascii=False,indent=indent)
+        print(f'>>> Json saved: {file_path}')
+      
+    
+    
 
     
 @dataclass
@@ -72,7 +91,7 @@ class VLMConfig(LLMConfig):
     lm_base_vocab_size: int = 49152
     extra_token_amount: int = 66  # Number of extra tokens for the VLM (image start, image end, image token)
     vocab_size: int = lm_base_vocab_size + extra_token_amount # Not a great way to do this, but it works for now (vlm_extra_tokens cannot be a dict, since this is mutable, and a Field has no len() function)
-    n_position: int = 8192
+    n_positions: int = 4096
     max_length:int=4096
     
     n_embd: int = 960
@@ -102,7 +121,7 @@ class VLMConfig(LLMConfig):
     vit_pdropout:float=0.0
     
     
-    vit_n_embd:int=64
+    vit_n_embd:int=768
     vit_n_intermediate:int = 4*vit_n_embd
     vit_n_heads:int=12
     vit_n_layers:int=12
