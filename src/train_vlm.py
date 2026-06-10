@@ -117,7 +117,7 @@ def get_dataloaders(train_cfg: TrainConfig,vlm_cfg: VLMConfig):
                 )['train']
             print(f"datasets 全局缓存根目录：{datasets_config.HF_DATASETS_CACHE}")
             print(f"数据集详情信息：\n{train_dataset.info}")
-            print(f"本地数据文件路径：{train_dataset._data_files}")
+            # print(f"本地数据文件路径：{train_dataset._data_files}")
             if train_cfg.stream_dataset:
                 next(iter(train_dataset)) # Check if the dataset is loaded correctly
             else:
