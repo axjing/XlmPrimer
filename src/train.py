@@ -139,7 +139,7 @@ def build_model_meta(depth):
     model_dim = ((base_dim + args.head_dim - 1) // args.head_dim) * args.head_dim
     num_heads = model_dim // args.head_dim
     config = LLMConfig(
-        sequence_len=args.max_seq_len, vocab_size=vocab_size,
+        n_positions==args.max_seq_len, vocab_size=vocab_size,
         n_layers=depth, n_heads=num_heads, n_kv_heads=num_heads, n_embd=model_dim,
         window_pattern=args.window_pattern,
     )

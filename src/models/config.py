@@ -22,6 +22,7 @@ class LLMConfig:
     n_heads:int=12 # 多头注意力头数，n_embd // n_head= 64，每个头的维度为64
     n_kv_heads:int=2
     n_intermediate :int=4*n_embd # 前馈网络中间层维度
+    window_pattern: str = "SSSL"
 
     # activation & normalization parameters
     activation_function:str="relu"
