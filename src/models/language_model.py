@@ -121,8 +121,18 @@ class LlamaTransformer(nn.Module):
             - The method returns the logits or embeddings along with the updated
             cache for efficient decoding.
         """
+        
         if self.lm_use_tokens:
-            x=self.token_embedding(x)
+            # Check if input is already embedded (float type) or token indices (integer type)
+            if x.dtype in (torch.float16, torch.float32, torch.float64):
+                # Input is already embedded, skip token embedding
+                print("Input is already embedded (float type), skipping token_embedding")
+            elif x.dtype in (torch.int32, torch.int64, torch.long, torch.int):
+                # Input is token indices, apply token embedding
+                x = self.token_embedding(x)
+            else:
+                # Unknown type, raise error with helpful message
+                raise ValueError(f"Unsupported input dtype: {x.dtype}. Expected integer (token indices) or float (embeddings).")
         
         bsz,seq_len_crr,n_embed=x.size()
         
@@ -236,8 +246,7 @@ class LlamaTransformer(nn.Module):
         cfg.n_kv_heads=hf_config.num_key_value_heads
         cfg.dropout=hf_config.attention_dropout
         cfg.n_layers=hf_config.num_hidden_layers
-        print(f"====> cfg:{cfg}")
-        print(f"====> hf_config: {hf_config}")
+
         # Create our model with potentially larger vocabulary
         model=cls(cfg)
         
