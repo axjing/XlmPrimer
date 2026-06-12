@@ -427,18 +427,18 @@ def train(train_cfg: TrainConfig, vlm_cfg: VLMConfig):
                 param_group_idx = 0
                 print("# multimodel project layer optimizer update")
                 if train_cfg.lr_mp > 0:
-                    adj_lr_mp = get_lr(global_step, train_cfg.lr_mp, train_cfg.max_training_steps)
+                    adj_lr_mp = get_learn_rate(global_step, train_cfg.lr_mp, train_cfg.max_training_steps)
                     optimizer.param_groups[param_group_idx]['lr'] = adj_lr_mp
                     param_group_idx += 1
                 print("# vision model optimizer update")
                 if train_cfg.lr_vision_backbone > 0:
-                    adj_lr_vision_backbone = get_lr(global_step, train_cfg.lr_vision_backbone, train_cfg.max_training_steps)
+                    adj_lr_vision_backbone = get_learn_rate(global_step, train_cfg.lr_vision_backbone, train_cfg.max_training_steps)
                     optimizer.param_groups[param_group_idx]['lr'] = adj_lr_vision_backbone
                     param_group_idx += 1
 
                 print("# language model optimizer update")
                 if train_cfg.lr_language_backbone > 0:
-                    adj_lr_language_backbone = get_lr(global_step, train_cfg.lr_language_backbone, train_cfg.max_training_steps)
+                    adj_lr_language_backbone = get_learn_rate(global_step, train_cfg.lr_language_backbone, train_cfg.max_training_steps)
                     optimizer.param_groups[param_group_idx]['lr'] = adj_lr_language_backbone
               
                 optimizer.step()

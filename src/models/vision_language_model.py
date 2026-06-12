@@ -147,7 +147,7 @@ class VisionLanguageModel(nn.Module):
             decode_step_output,kv_cache_list=self.decoder(
                 next_token_embd,
                 attention_mask=attention_mask,
-                kv_chache=kv_cache_list,
+                kv_cache=kv_cache_list,
                 start_pos=current_token_start_pos
             )
             last_token_output = decode_step_output[:, -1, :] 

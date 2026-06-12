@@ -240,3 +240,29 @@ pytest src/test_model.py -v
 ---
 
 **A8llm** - 让每个人都能理解和使用的GPT实现！
+
+## ModelCard
+
+三、完整流程显存需求对比表
+
+|模型|预训练|SFT|DPO|GRPO/RLHF|	推荐方案|
+|---|---|---|---|---|---|
+|Qwen/Qwen3.5-0.8B|
+|Qwen/Qwen3.5-2B|
+|Qwen/Qwen3.5-4B|
+|Qwen/Qwen2.5-0.5B-Instruct|
+|Qwen/Qwen3-0.6B|
+|meta-llama/Llama-3.2-1B|
+|google/gemma-2-2b|
+|google/gemma-3-270m
+|google/gemma-4-E2B|
+|HuggingFaceTB/SmolLM2-360M-Instruct|
+|HuggingFaceTB/SmolVLM-Instruct|
+|HuggingFaceTB/SmolVLM-Base|
+|HuggingFaceTB/SmolLM3-3B|
+|HuggingFaceTB/SmolLM2-360M|
+|HuggingFaceTB/SmolLM2-135M|
+|HuggingFaceTB/SmolLM-135M|
+|microsoft/Phi-3.5-vision-instruct|
+|microsoft/Phi-3-mini-4k-instruct|
+|microsoft/Phi-3-mini-128k-instruct|

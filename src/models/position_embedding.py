@@ -92,7 +92,7 @@ def rotate_half(x:torch.Tensor) -> torch.Tensor:
     x1,x2=x.chunk(2,dim=-1)
     return torch.cat((-x2,x1),dim=-1)
 
-def apply_rotary_postision_embd(q: torch.Tensor,k:torch.Tensor,cos:torch.Tensor,sin:torch.Tensor,unsqueeze_dim:int=1)-> tuple[torch.Tensor,torch.Tensor]:
+def apply_rotary_position_embd(q: torch.Tensor,k:torch.Tensor,cos:torch.Tensor,sin:torch.Tensor,unsqueeze_dim:int=1)-> tuple[torch.Tensor,torch.Tensor]:
     """
     Applies rotary positional embeddings to query and key tensors in attention mechanisms.
 

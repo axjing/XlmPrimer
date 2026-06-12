@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.models.config import LLMConfig
-from src.models.position_embedding import apply_rotary_postision_embd
+from src.models.position_embedding import apply_rotary_position_embd
 
 
 class Linear(nn.Linear):
@@ -81,7 +81,7 @@ class LayerNorm(nn.Module):
         self.device=device
         
         self.weight=nn.Parameter(torch.ones(normalized_shape))
-        self.bias=nn.Parameter(torch.zeros(normalized_shape)) if bias else None
+        
     
     def forward(self,x):
         o=F.layer_norm(x,self.weight.shape, self.weight, self.bias, self.eps)
@@ -281,7 +281,7 @@ class GroupedQueryAttention(nn.Module):
         v_cur=self.v_attn(x).view(bsz,seq_len,self.n_kv_head,n_embd//self.n_head).transpose(1,2) # (bsz,n_head,seq_len,head_dim)
         
         # Apply rotary embeddings to the current q and k
-        q_rotated,k_rotated=apply_rotary_postision_embd(q_cur,k_cur,cos,sin)
+        q_rotated,k_rotated=apply_rotary_position_embd(q_cur,k_cur,cos,sin)
         
         # check if we can use cached keys and values
         if not is_prefill and block_kv_cache['key'] is not None:
@@ -408,28 +408,4 @@ class MLP(nn.Module):
         x=self.activate_fn(x)
         x=self.c_proj(x)
         x=self.resid_dropout(x)
-        return x
-    
-class Block(nn.Module):
-    """Block 层"""
-    def __init__(self,cfg: LLMConfig):
-        super().__init__()
-        self.ln_1=LayerNorm(cfg.n_embd,bias=cfg.bias)
-        self.attn=CausalSelfAttention(cfg)
-        self.ln_2=LayerNorm(cfg.n_embd,bias=cfg.bias)
-        
-        
-        self.mlp=MLP(cfg)
-    
-    def forward(self,x:torch.Tensor)->torch.Tensor:
-        residual=x
-        x=self.ln_1(x)
-        x,_=self.attn(x)
-        x=x+residual
-        
-        residual=x
-        x=self.ln_2(x)
-        x=self.mlp(x)
-        x=x+residual
-        
         return x

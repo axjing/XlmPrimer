@@ -277,7 +277,7 @@ class LlamaTransformer(nn.Module):
             block_prefix=f'blocks.{i}.'
             
             mapping.update({
-                f'{layer_prefix}self_attn.q_proj,weight':f'{block_prefix}self_attn.q_attn.weight',
+                f'{layer_prefix}self_attn.q_proj.weight':f'{block_prefix}self_attn.q_attn.weight',
                 f'{layer_prefix}self_attn.k_proj.weight':f'{block_prefix}attn.k_attn.weight',
                 f"{layer_prefix}self_attn.v_proj.weight": f"{block_prefix}attn.v_attn.weight",
                 f"{layer_prefix}self_attn.o_proj.weight": f"{block_prefix}attn.c_proj.weight",

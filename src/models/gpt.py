@@ -100,12 +100,12 @@ class GPT(nn.Module):
         
         assert seq_len <=self.config.n_positions, f"序列长度 {seq_len}超过模型支持的最长上下文长度 {self.config.n_positions}"
         
-        ipositions=torch.arange(0,seq_len,dtype=torch.long,device=device) # shape(seq_len)
+        positions=torch.arange(0,seq_len,dtype=torch.long,device=device) # shape(seq_len)
         
         # forward pass
         
         # token_embd=self.transformer.wte(idx) # token embedding shape(bsz,seq_len,n_embd)
-        # position_embd=self.transformer.wpe(ipositions) # position embedding shape(seq_len,n_embd)
+        # position_embd=self.transformer.wpe(positions) # position embedding shape(seq_len,n_embd)
         
         # x=self.transformer.drop(token_embd+position_embd)
         
@@ -114,7 +114,7 @@ class GPT(nn.Module):
         # x=self.transformer.ln_f(x)
         
         inputs_embeds=self.wte(idx) # token embedding shape(bsz,seq_len,n_embd)
-        position_embd=self.wpe(ipositions) # position embedding shape(seq_len,n_embd)
+        position_embd=self.wpe(positions) # position embedding shape(seq_len,n_embd)
         x=self.drop(inputs_embeds+position_embd)
         
         for block in self.h:
