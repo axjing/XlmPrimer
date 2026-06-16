@@ -14,9 +14,10 @@
 
 import torch
 import torch.nn.functional as F
-import signal
 import warnings
 from contextlib import contextmanager
+import ast
+import re
 from collections import deque
 from src.trainer.distributed import compute_init, autodetect_device_type
 from src.engine.utils_checkpoints import load_model
@@ -24,60 +25,98 @@ from src.engine.utils_checkpoints import load_model
 # -----------------------------------------------------------------------------
 # Calculator tool helpers
 @contextmanager
-def timeout(duration, formula):
-    def timeout_handler(signum, frame):
-        raise Exception(f"'{formula}': timed out after {duration} seconds")
-
-    signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(duration)
+def _null_context():
+    # kept for API compatibility if needed elsewhere
     yield
-    signal.alarm(0)
 
-def eval_with_timeout(formula, max_time=3):
+
+def _safe_eval_math(expr: str):
+    """Safely evaluate simple math expressions using AST.
+
+    Supported operators: +, -, *, /, % and unary +/-. Power (**) and any calls
+    or names are disallowed.
+    """
     try:
-        with timeout(max_time, formula):
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore", SyntaxWarning)
-                return eval(formula, {"__builtins__": {}}, {})
-    except Exception as e:
-        signal.alarm(0)
-        # print(f"Warning: Failed to eval {formula}, exception: {e}") # it's ok ignore wrong calculator usage
+        node = ast.parse(expr, mode='eval')
+    except Exception:
         return None
 
-def use_calculator(expr):
-    """
-    Evaluate a Python expression safely.
-    Supports both math expressions and string operations like .count()
-    """
-    # Remove commas from numbers
+    def _check_and_eval(n):
+        if isinstance(n, ast.Expression):
+            return _check_and_eval(n.body)
+        if isinstance(n, ast.BinOp):
+            left = _check_and_eval(n.left)
+            right = _check_and_eval(n.right)
+            if left is None or right is None:
+                return None
+            if isinstance(n.op, ast.Add):
+                return left + right
+            if isinstance(n.op, ast.Sub):
+                return left - right
+            if isinstance(n.op, ast.Mult):
+                return left * right
+            if isinstance(n.op, ast.Div):
+                return left / right
+            if isinstance(n.op, ast.Mod):
+                return left % right
+            # disallow Pow, FloorDiv, Bitwise ops
+            return None
+        if isinstance(n, ast.UnaryOp):
+            operand = _check_and_eval(n.operand)
+            if operand is None:
+                return None
+            if isinstance(n.op, ast.UAdd):
+                return +operand
+            if isinstance(n.op, ast.USub):
+                return -operand
+            return None
+        if isinstance(n, ast.Constant):
+            if isinstance(n.value, (int, float)):
+                return n.value
+            return None
+        # For Python <3.8 compatibility, Num
+        if isinstance(n, ast.Num):
+            return n.n
+        # All other node types disallowed
+        return None
+
+    result = _check_and_eval(node)
+    return result
+
+
+_STR_COUNT_RE = re.compile(r"^\s*(['\"])(.*)\1\.count\(\s*(['\"])(.*)\3\s*\)\s*$")
+
+
+def use_calculator(expr: str):
+    """Evaluate restricted expressions: simple math or '<str>'.count('<sub>')"""
+    if not isinstance(expr, str):
+        return None
+    # Remove commas from numbers like '1,000'
     expr = expr.replace(",", "")
 
-    # Check if it's a pure math expression (old behavior)
-    if all([x in "0123456789*+-/.() " for x in expr]):
-        if "**" in expr:  # disallow power operator
+    # Quick reject dangerous tokens
+    low = expr.lower()
+    for bad in ['__', 'import', 'exec', 'eval', 'compile', 'open', 'input', 'globals', 'locals', 'getattr', 'setattr']:
+        if bad in low:
             return None
-        return eval_with_timeout(expr)
 
-    # Check if it's a string operation we support
-    # Allow: strings (single/double quotes), .count(), letters, numbers, spaces, parens
-    allowed_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'\"()._ "
-    if not all([x in allowed_chars for x in expr]):
-        return None
+    # Math expression path: allow digits, operators and parentheses
+    if re.fullmatch(r"[0-9+\-*/ %.()]+", expr):
+        if "**" in expr:
+            return None
+        return _safe_eval_math(expr)
 
-    # Disallow dangerous patterns
-    dangerous_patterns = ['__', 'import', 'exec', 'eval', 'compile', 'open', 'file',
-                         'input', 'raw_input', 'globals', 'locals', 'vars', 'dir',
-                         'getattr', 'setattr', 'delattr', 'hasattr']
-    expr_lower = expr.lower()
-    if any(pattern in expr_lower for pattern in dangerous_patterns):
-        return None
+    # String.count() path
+    m = _STR_COUNT_RE.match(expr)
+    if m:
+        hay = m.group(2)
+        needle = m.group(4)
+        try:
+            return hay.count(needle)
+        except Exception:
+            return None
 
-    # Only allow .count() method for now (can expand later)
-    if '.count(' not in expr:
-        return None
-
-    # Evaluate with timeout
-    return eval_with_timeout(expr)
+    return None
 
 # -----------------------------------------------------------------------------
 class KVCache:
@@ -96,18 +135,62 @@ class KVCache:
         self.n_layers = num_layers
         self.n_heads = num_heads
         self.head_dim = head_dim
-        # Pre-allocate cache tensors: (n_layers, B, T, H, D)
-        self.k_cache = torch.zeros(num_layers, batch_size, seq_len, num_heads, head_dim, device=device, dtype=dtype)
-        self.v_cache = torch.zeros(num_layers, batch_size, seq_len, num_heads, head_dim, device=device, dtype=dtype)
+        # Lazy allocation for cache tensors to avoid huge upfront allocations.
+        # `seq_len` is treated as a maximum hint; actual buffers are allocated
+        # only when needed via `_ensure_capacity` or during prefill.
+        self._device = device
+        self._dtype = dtype
+        self._alloc_len = 0  # current allocated time dimension
+        self.k_cache = None
+        self.v_cache = None
         # Current sequence length per batch element (FA3 needs int32)
         self.cache_seqlens = torch.zeros(batch_size, dtype=torch.int32, device=device)
         # Previous token's normalized embedding for smear (set by model forward pass)
         self.prev_embedding = None
 
+        # Heuristic: allocate immediately in the common prefill case when
+        # batch_size==1 and seq_len is small, otherwise postpone allocation.
+        try:
+            hint = int(seq_len)
+        except Exception:
+            hint = 0
+        if batch_size == 1 and hint > 0 and hint <= 4096:
+            self._ensure_capacity(hint)
+
     def reset(self):
         """Reset cache to empty state."""
         self.cache_seqlens.zero_()
         self.prev_embedding = None
+
+    def _ensure_capacity(self, required_len: int):
+        """Ensure k_cache/v_cache have capacity for `required_len` sequence length.
+
+        If current allocation is smaller, allocate new tensors with the same
+        device/dtype and copy existing contents (if any).
+        """
+        if required_len <= self._alloc_len:
+            return
+        # clamp to max_seq_len if provided (>0)
+        target = required_len
+        if hasattr(self, 'max_seq_len') and self.max_seq_len is not None and self.max_seq_len > 0:
+            target = min(target, self.max_seq_len)
+
+        new_shape = (self.n_layers, self.batch_size, target, self.n_heads, self.head_dim)
+        # allocate new buffers
+        new_k = torch.empty(new_shape, device=self._device, dtype=self._dtype)
+        new_v = torch.empty(new_shape, device=self._device, dtype=self._dtype)
+        # initialize to zero for safety
+        new_k.zero_()
+        new_v.zero_()
+        # copy old data if present
+        if self.k_cache is not None:
+            old_len = self._alloc_len
+            new_k[:, :, :old_len, :, :].copy_(self.k_cache)
+            new_v[:, :, :old_len, :, :].copy_(self.v_cache)
+
+        self.k_cache = new_k
+        self.v_cache = new_v
+        self._alloc_len = target
 
     def get_pos(self):
         """Get current position (assumes all batch elements at same position)."""
@@ -115,10 +198,16 @@ class KVCache:
 
     def get_layer_cache(self, layer_idx):
         """Return (k_cache, v_cache) views for a specific layer."""
+        if self.k_cache is None or self.v_cache is None:
+            return None, None
         return self.k_cache[layer_idx], self.v_cache[layer_idx]
 
     def advance(self, num_tokens):
         """Advance the cache position by num_tokens."""
+        # ensure we have room for the advance
+        max_pos = int(self.cache_seqlens.max().item() + num_tokens)
+        if max_pos > self._alloc_len:
+            self._ensure_capacity(max_pos)
         self.cache_seqlens += num_tokens
 
     def prefill(self, other):
@@ -128,11 +217,16 @@ class KVCache:
         """
         assert self.get_pos() == 0, "Cannot prefill a non-empty KV cache"
         assert self.n_layers == other.n_layers and self.n_heads == other.n_heads and self.head_dim == other.head_dim
-        assert self.max_seq_len >= other.max_seq_len
         other_pos = other.get_pos()
-        self.k_cache[:, :, :other_pos, :, :] = other.k_cache[:, :, :other_pos, :, :]
-        self.v_cache[:, :, :other_pos, :, :] = other.v_cache[:, :, :other_pos, :, :]
-        self.cache_seqlens.fill_(other_pos)
+        # ensure capacity for other_pos
+        if other_pos > 0:
+            self._ensure_capacity(other_pos)
+            # copy the underlying tensors
+            if other.k_cache is not None:
+                self.k_cache[:, :, :other_pos, :, :].copy_(other.k_cache[:, :, :other_pos, :, :])
+            if other.v_cache is not None:
+                self.v_cache[:, :, :other_pos, :, :].copy_(other.v_cache[:, :, :other_pos, :, :])
+            self.cache_seqlens.fill_(other_pos)
         # Copy smear state: expand batch=1 prev_embedding to num_samples
         if other.prev_embedding is not None:
             self.prev_embedding = other.prev_embedding.expand(self.batch_size, -1, -1).clone()
